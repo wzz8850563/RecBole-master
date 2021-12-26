@@ -45,7 +45,7 @@ class KnowledgeBasedDataset(Dataset):
 
         relation_field (str): The same as ``config['RELATION_ID_FIELD']``.
 
-        entity_field (str): The same as ``config['ENTITY_ID_FIELD']``.
+        entity_field (str): The same as ``config['ENTITY_ID_FIELD']``. #应该是实体类型
 
         kg_feat (pandas.DataFrame): Internal data structure stores the kg triplets.
             It's loaded from file ``.kg``.
@@ -83,7 +83,7 @@ class KnowledgeBasedDataset(Dataset):
         super()._data_filtering()
         self._filter_link()
 
-    def _filter_link(self):
+    def _filter_link(self):#只保留在interaction和kg triplets出现的实体id对应的link，没有在交互数据的保留这个link没有意义
         """Filter rows of :attr:`item2entity` and :attr:`entity2item`,
         whose ``entity_id`` doesn't occur in kg triplets and
         ``item_id`` doesn't occur in interaction records.
@@ -224,7 +224,7 @@ class KnowledgeBasedDataset(Dataset):
                 split_point = np.cumsum(feat[field].agg(len))[:-1]
                 feat[field] = np.split(new_idx, split_point)
 
-    def _merge_item_and_entity(self):
+    def _merge_item_and_entity(self):#itemid和entityid通过link文件对应
         """Merge item-id and entity-id into the same id-space.
         """
         item_token = self.field2id_token[self.iid_field]

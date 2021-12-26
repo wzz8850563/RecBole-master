@@ -20,12 +20,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from recbole.model.abstract_recommender import KnowledgeRecommender
-from recbole.model.init import xavier_normal_initialization
+from recbole.model.init import xavier_normal_initialization #https://zhuanlan.zhihu.com/p/27919794
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import InputType
 
 
-class Aggregator(nn.Module):
+class Aggregator(nn.Module):#聚合器，用于将初始head实体ego-emding和head通过传播得到的side-emding进行整合的方法
     """ GNN Aggregator layer
     """
 
@@ -38,11 +38,11 @@ class Aggregator(nn.Module):
 
         self.message_dropout = nn.Dropout(dropout)
 
-        if self.aggregator_type == 'gcn':
+        if self.aggregator_type == 'gcn':#论文公式（6）
             self.W = nn.Linear(self.input_dim, self.output_dim)
-        elif self.aggregator_type == 'graphsage':
+        elif self.aggregator_type == 'graphsage':#论文公式（7）
             self.W = nn.Linear(self.input_dim * 2, self.output_dim)
-        elif self.aggregator_type == 'bi':
+        elif self.aggregator_type == 'bi':#论文公式（8）
             self.W1 = nn.Linear(self.input_dim, self.output_dim)
             self.W2 = nn.Linear(self.input_dim, self.output_dim)
         else:
@@ -51,7 +51,7 @@ class Aggregator(nn.Module):
         self.activation = nn.LeakyReLU()
 
     def forward(self, norm_matrix, ego_embeddings):
-        side_embeddings = torch.sparse.mm(norm_matrix, ego_embeddings)
+        side_embeddings = torch.sparse.mm(norm_matrix, ego_embeddings)#矩阵相乘
 
         if self.aggregator_type == 'gcn':
             ego_embeddings = self.activation(self.W(ego_embeddings + side_embeddings))
@@ -60,7 +60,7 @@ class Aggregator(nn.Module):
         elif self.aggregator_type == 'bi':
             add_embeddings = ego_embeddings + side_embeddings
             sum_embeddings = self.activation(self.W1(add_embeddings))
-            bi_embeddings = torch.mul(ego_embeddings, side_embeddings)
+            bi_embeddings = torch.mul(ego_embeddings, side_embeddings)#对位相乘
             bi_embeddings = self.activation(self.W2(bi_embeddings))
             ego_embeddings = bi_embeddings + sum_embeddings
         else:
@@ -83,11 +83,12 @@ class KGAT(KnowledgeRecommender):
         super(KGAT, self).__init__(config, dataset)
 
         # load dataset info
-        self.ckg = dataset.ckg_graph(form='dgl', value_field='relation_id')
+        self.ckg = dataset.ckg_graph(form='dgl', value_field='relation_id')#实体和实体关系矩阵
         self.all_hs = torch.LongTensor(dataset.ckg_graph(form='coo', value_field='relation_id').row).to(self.device)
         self.all_ts = torch.LongTensor(dataset.ckg_graph(form='coo', value_field='relation_id').col).to(self.device)
         self.all_rs = torch.LongTensor(dataset.ckg_graph(form='coo', value_field='relation_id').data).to(self.device)
-        self.matrix_size = torch.Size([self.n_users + self.n_entities, self.n_users + self.n_entities])
+        #users,entities都是实体
+        self.matrix_size = torch.Size([self.n_users + self.n_entities, self.n_users + self.n_entities])#正方形矩阵[self.n_users + self.n_entities,self.n_users + self.n_entities]
 
         # load parameters info
         self.embedding_size = config['embedding_size']
@@ -98,13 +99,13 @@ class KGAT(KnowledgeRecommender):
         self.reg_weight = config['reg_weight']
 
         # generate intermediate data
-        self.A_in = self.init_graph()  # init the attention matrix by the structure of ckg
+        self.A_in = self.init_graph()   # init the attention matrix by the structure of ckg
 
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.entity_embedding = nn.Embedding(self.n_entities, self.embedding_size)
         self.relation_embedding = nn.Embedding(self.n_relations, self.kg_embedding_size)
-        self.trans_w = nn.Embedding(self.n_relations, self.embedding_size * self.kg_embedding_size)
+        self.trans_w = nn.Embedding(self.n_relations, self.embedding_size * self.kg_embedding_size)#self.embedding_size * self.kg_embedding_size 的矩阵
         self.aggregator_layers = nn.ModuleList()
         for idx, (input_dim, output_dim) in enumerate(zip(self.layers[:-1], self.layers[1:])):
             self.aggregator_layers.append(Aggregator(input_dim, output_dim, self.mess_dropout, self.aggregator_type))
@@ -118,7 +119,7 @@ class KGAT(KnowledgeRecommender):
         self.apply(xavier_normal_initialization)
         self.other_parameter_name = ['restore_user_e', 'restore_entity_e']
 
-    def init_graph(self):
+    def init_graph(self):## ？？？？这里好像和论文公式（3）（4）有差异
         r"""Get the initial attention matrix through the collaborative knowledge graph
 
         Returns:
@@ -126,37 +127,37 @@ class KGAT(KnowledgeRecommender):
         """
         import dgl
         adj_list = []
-        for rel_type in range(1, self.n_relations, 1):
+        for rel_type in range(1, self.n_relations, 1):#遍历所有relation,除了第0个，是user对item的行为
             edge_idxs = self.ckg.filter_edges(lambda edge: edge.data['relation_id'] == rel_type)
             sub_graph = dgl.edge_subgraph(self.ckg, edge_idxs, preserve_nodes=True). \
-                adjacency_matrix(transpose=False, scipy_fmt='coo').astype('float')
-            rowsum = np.array(sub_graph.sum(1))
-            d_inv = np.power(rowsum, -1).flatten()
-            d_inv[np.isinf(d_inv)] = 0.
-            d_mat_inv = sp.diags(d_inv)
-            norm_adj = d_mat_inv.dot(sub_graph).tocoo()
+                adjacency_matrix(transpose=False, scipy_fmt='coo').astype('float')#遍历每个relation,取出当前relation成的边作为节点，转化成矩阵形式
+            rowsum = np.array(sub_graph.sum(1))#每行求和
+            d_inv = np.power(rowsum, -1).flatten()#求和倒数，用于每行的标准化
+            d_inv[np.isinf(d_inv)] = 0.#整行为0的，求和倒数作为0
+            d_mat_inv = sp.diags(d_inv)#对角阵
+            norm_adj = d_mat_inv.dot(sub_graph).tocoo()#根据以上操作，相当于对每行进行求和，对应行元素除以行的和，实现按行标准化，每行是一个头实体和所有尾实体交互，相当于对每个头实体交互的标准化
             adj_list.append(norm_adj)
-
-        final_adj_matrix = sum(adj_list).tocoo()
+        
+        final_adj_matrix = sum(adj_list).tocoo()#sum之后，相当于多个relation合并成有一个，注意因为多数三元组唯一性，合并relation后同一位置不会出现重合现象，属于填补。可能也有个别相同h,t实体不同关系，就属于相加了
         indices = torch.LongTensor([final_adj_matrix.row, final_adj_matrix.col])
         values = torch.FloatTensor(final_adj_matrix.data)
-        adj_matrix_tensor = torch.sparse.FloatTensor(indices, values, self.matrix_size)
+        adj_matrix_tensor = torch.sparse.FloatTensor(indices, values, self.matrix_size)#转化成tenosr 矩阵形式
         return adj_matrix_tensor.to(self.device)
 
-    def _get_ego_embeddings(self):
+    def _get_ego_embeddings(self):#实体embding,把user和entit拼在一起
         user_embeddings = self.user_embedding.weight
         entity_embeddings = self.entity_embedding.weight
-        ego_embeddings = torch.cat([user_embeddings, entity_embeddings], dim=0)
+        ego_embeddings = torch.cat([user_embeddings, entity_embeddings], dim=0)#每行是一个entity向量，维度为(n_user+n_ent)*dim
         return ego_embeddings
 
-    def forward(self):
+    def forward(self):#这样只是走了一轮，即用周围实体更新一遍实体而已
         ego_embeddings = self._get_ego_embeddings()
         embeddings_list = [ego_embeddings]
         for aggregator in self.aggregator_layers:
             ego_embeddings = aggregator(self.A_in, ego_embeddings)
-            norm_embeddings = F.normalize(ego_embeddings, p=2, dim=1)
+            norm_embeddings = F.normalize(ego_embeddings, p=2, dim=1)#以2位范数，矩阵的每行进行标准化为单位向量，即a/np.sqrt(a**2+b**2+...),
             embeddings_list.append(norm_embeddings)
-        kgat_all_embeddings = torch.cat(embeddings_list, dim=1)
+        kgat_all_embeddings = torch.cat(embeddings_list, dim=1)#假设有n个聚合器，那出来为(n_user+n_ent)*（n*dim）
         user_all_embeddings, entity_all_embeddings = torch.split(kgat_all_embeddings, [self.n_users, self.n_entities])
         return user_all_embeddings, entity_all_embeddings
 
@@ -187,7 +188,7 @@ class KGAT(KnowledgeRecommender):
         pos_embeddings = entity_all_embeddings[pos_item]
         neg_embeddings = entity_all_embeddings[neg_item]
 
-        pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
+        pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)#mul对位相乘，再相加，是就是两个向量内积了
         neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
         mf_loss = self.mf_loss(pos_scores, neg_scores)
         reg_loss = self.reg_loss(u_embeddings, pos_embeddings, neg_embeddings)
@@ -241,14 +242,14 @@ class KGAT(KnowledgeRecommender):
         r_e = self.relation_embedding.weight[r]
         r_trans_w = self.trans_w.weight[r].view(self.embedding_size, self.kg_embedding_size)
 
-        h_e = torch.matmul(h_e, r_trans_w)
+        h_e = torch.matmul(h_e, r_trans_w)#矩阵相乘
         t_e = torch.matmul(t_e, r_trans_w)
 
-        kg_score = torch.mul(t_e, self.tanh(h_e + r_e)).sum(dim=1)
+        kg_score = torch.mul(t_e, self.tanh(h_e + r_e)).sum(dim=1)#相当于相邻两内积
 
         return kg_score
 
-    def update_attentive_A(self):
+    def update_attentive_A(self):## 这个才是论文公式（3）（4）计算attention
         r"""Update the attention matrix using the updated embedding matrix
 
         """

@@ -78,14 +78,14 @@ class Trainer(AbstractTrainer):
 
         self.logger = getLogger()
         self.tensorboard = get_tensorboard(self.logger)
-        self.learner = config['learner']
+        self.learner = config['learner']#优化函数，如adam
         self.learning_rate = config['learning_rate']
         self.epochs = config['epochs']
-        self.eval_step = min(config['eval_step'], self.epochs)
+        self.eval_step = min(config['eval_step'], self.epochs)#每训练多少个epoch做一次验证
         self.stopping_step = config['stopping_step']
         self.clip_grad_norm = config['clip_grad_norm']
         self.valid_metric = config['valid_metric'].lower()
-        self.valid_metric_bigger = config['valid_metric_bigger']
+        self.valid_metric_bigger = config['valid_metric_bigger']#是否值越大代表效果越好，ture或false
         self.test_batch_size = config['eval_batch_size']
         self.gpu_available = torch.cuda.is_available() and config['use_gpu']
         self.device = config['device']
@@ -136,7 +136,7 @@ class Trainer(AbstractTrainer):
             optimizer = optim.Adam(params, lr=self.learning_rate)
         return optimizer
 
-    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):#每次运行函数会执行完一整个epoch,即处理完全部数据
         r"""Train the model in an epoch
 
         Args:
@@ -152,7 +152,7 @@ class Trainer(AbstractTrainer):
             tuple which includes the sum of loss in each part.
         """
         self.model.train()
-        loss_func = loss_func or self.model.calculate_loss
+        loss_func = loss_func or self.model.calculate_loss#model中定义的calculate_loss函数
         total_loss = None
         iter_data = (
             tqdm(
@@ -166,18 +166,18 @@ class Trainer(AbstractTrainer):
             interaction = interaction.to(self.device)
             self.optimizer.zero_grad()
             losses = loss_func(interaction)
-            if isinstance(losses, tuple):
+            if isinstance(losses, tuple):#如果loss是数组类型，
                 loss = sum(losses)
-                loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                loss_tuple = tuple(per_loss.item() for per_loss in losses)#item用法举例 tensor([0.1]).item()  ->  0.1   ,对tensor数转化为普通数
                 total_loss = loss_tuple if total_loss is None else tuple(map(sum, zip(total_loss, loss_tuple)))
             else:
                 loss = losses
                 total_loss = losses.item() if total_loss is None else total_loss + losses.item()
             self._check_nan(loss)
             loss.backward()
-            if self.clip_grad_norm:
+            if self.clip_grad_norm:#梯度裁剪，防止某些梯度太大，做限制 https://zhuanlan.zhihu.com/p/353871841
                 clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            self.optimizer.step()
+            self.optimizer.step()#更新优化器  ，如果有梯度裁剪，先裁剪，再更新梯度
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(set_color('GPU RAM: ' + get_gpu_usage(self.device), 'yellow'))
         return total_loss
@@ -305,7 +305,7 @@ class Trainer(AbstractTrainer):
         Returns:
              (float, dict): best valid score and best valid result. If valid_data is None, it returns (-1, None)
         """
-        if saved and self.start_epoch >= self.epochs:
+        if saved and self.start_epoch >= self.epochs: #训练完所有epoch才保存
             self._save_checkpoint(-1)
 
         self.eval_collector.data_collect(train_data)
@@ -314,7 +314,7 @@ class Trainer(AbstractTrainer):
             # train
             training_start_time = time()
             train_loss = self._train_epoch(train_data, epoch_idx, show_progress=show_progress)
-            self.train_loss_dict[epoch_idx] = sum(train_loss) if isinstance(train_loss, tuple) else train_loss
+            self.train_loss_dict[epoch_idx] = sum(train_loss) if isinstance(train_loss, tuple) else train_loss  #记录每个epoch的loss
             training_end_time = time()
             train_loss_output = \
                 self._generate_train_loss_output(epoch_idx, training_start_time, training_end_time, train_loss)

@@ -100,7 +100,7 @@ class AbstractDataLoader:
 class NegSampleDataLoader(AbstractDataLoader):
     """:class:`NegSampleDataLoader` is an abstract class which can sample negative examples by ratio.
     It has two neg-sampling method, the one is 1-by-1 neg-sampling (pair wise),
-    and the other is 1-by-multi neg-sampling (point wise).
+    and the other is 1-by-multi neg-sampling (point wise).  
 
     Args:
         config (Config): The config of dataloader.

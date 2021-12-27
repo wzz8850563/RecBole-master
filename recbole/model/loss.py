@@ -41,7 +41,7 @@ class BPRLoss(nn.Module):
         super(BPRLoss, self).__init__()
         self.gamma = gamma
 
-    def forward(self, pos_score, neg_score):
+    def forward(self, pos_score, neg_score):#pos_score，neg_score都是tensor数组，不是一个数
         loss = -torch.log(self.gamma + torch.sigmoid(pos_score - neg_score)).mean()
         return loss
 

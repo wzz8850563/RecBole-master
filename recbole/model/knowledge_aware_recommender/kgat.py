@@ -249,7 +249,7 @@ class KGAT(KnowledgeRecommender):
 
         return kg_score
 
-    def update_attentive_A(self):## 这个才是论文公式（3）（4）计算attention
+    def update_attentive_A(self):## 这个才是论文公式（3）（4）计算attention    #见trainer.py  KGATTrainer 使用，每次训练完一轮后再更新A矩阵
         r"""Update the attention matrix using the updated embedding matrix
 
         """

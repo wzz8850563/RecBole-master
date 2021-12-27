@@ -1456,7 +1456,7 @@ class Dataset(object):
         """
         self.inter_feat.sort(by=by, ascending=ascending)
 
-    def build(self):
+    def build(self):#参考https://recbole.io/docs/user_guide/config/evaluation_settings.html?highlight=eval_args 参数含义
         """Processing dataset according to evaluation setting, including Group, Order and Split.
         See :class:`~recbole.config.eval_setting.EvalSetting` for details.
 
@@ -1470,7 +1470,7 @@ class Dataset(object):
             datasets = [self.copy(self.inter_feat[start:end]) for start, end in zip([0] + cumsum[:-1], cumsum)]
             return datasets
 
-        # ordering
+        # ordering  #数据排序
         ordering_args = self.config['eval_args']['order']
         if ordering_args == 'RO':
             self.shuffle()
@@ -1479,22 +1479,22 @@ class Dataset(object):
         else:
             raise NotImplementedError(f'The ordering_method [{ordering_args}] has not been implemented.')
 
-        # splitting & grouping
+        # splitting & grouping  #数据分组为  训练，验证，测试
         split_args = self.config['eval_args']['split']
         if split_args is None:
             raise ValueError('The split_args in eval_args should not be None.')
-        if not isinstance(split_args, dict):
+        if not isinstance(split_args, dict):#形式类似 {'RS': [0.8, 0.1, 0.1]}
             raise ValueError(f'The split_args [{split_args}] should be a dict.')
 
         split_mode = list(split_args.keys())[0]
         assert len(split_args.keys()) == 1
         group_by = self.config['eval_args']['group_by']
-        if split_mode == 'RS':
+        if split_mode == 'RS': 
             if not isinstance(split_args['RS'], list):
                 raise ValueError(f'The value of "RS" [{split_args}] should be a list.')
             if group_by is None or group_by.lower() == 'none':
                 datasets = self.split_by_ratio(split_args['RS'], group_by=None)
-            elif group_by == 'user':
+            elif group_by == 'user':#对每个user都按比例分成训练，测试，验证集合
                 datasets = self.split_by_ratio(split_args['RS'], group_by=self.uid_field)
             else:
                 raise NotImplementedError(f'The grouping method [{group_by}] has not been implemented.')

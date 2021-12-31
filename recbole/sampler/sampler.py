@@ -105,7 +105,7 @@ class AbstractSampler(object):
         """
 
         keys = list(self.prob.keys())
-        random_index_list = np.random.randint(0, len(keys), sample_num)
+        random_index_list = np.random.randint(0, len(keys), sample_num)#从0--len(keys)-1 这么多个整数随机采样sample_num个，可能会重复
         random_prob_list = np.random.random(sample_num)
         final_random_list = []
 

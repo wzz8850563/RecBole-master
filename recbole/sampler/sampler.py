@@ -71,30 +71,30 @@ class AbstractSampler(object):
         """Build alias table for popularity_biased sampling.
         """
         candidates_list = self._get_candidates_list()
-        self.prob = dict(Counter(candidates_list))
+        self.prob = dict(Counter(candidates_list))#item出现频次的分布
         self.alias = self.prob.copy()
         large_q = []
         small_q = []
 
         for i in self.prob:
             self.alias[i] = -1
-            self.prob[i] = self.prob[i] / len(candidates_list) * len(self.prob)
-            if self.prob[i] > 1:
+            self.prob[i] = self.prob[i] / len(candidates_list) * len(self.prob)#相当于做了过缩放，使得出现一次的都在0-1的范围，出现2词以上有可能在0-1范围，也有可能>1
+            if self.prob[i] > 1:#出现频次大的
                 large_q.append(i)
-            elif self.prob[i] < 1:
+            elif self.prob[i] < 1: #出现频次小的
                 small_q.append(i)
 
-        while len(large_q) != 0 and len(small_q) != 0:
+        while len(large_q) != 0 and len(small_q) != 0:#循环直到large_q或small_q有一个为空，这个过程除了small_q中的索引对应的self.alias变成1外，large_q中的部分相对频率小的索引也会在self.alias变成1
             l = large_q.pop(0)
             s = small_q.pop(0)
-            self.alias[s] = l
-            self.prob[l] = self.prob[l] - (1 - self.prob[s])
+            self.alias[s] = l #small_q中的index都变成1
+            self.prob[l] = self.prob[l] - (1 - self.prob[s])#进行此操作后出现频率大的索引概率会减少  0-1de 范围
             if self.prob[l] < 1:
                 small_q.append(l)
             elif self.prob[l] > 1:
                 large_q.append(l)
 
-    def _pop_sampling(self, sample_num):
+    def _pop_sampling(self, sample_num):#根据热度采样，如有的itemid出现的频率多，相应的概率也会大
         """Sample [sample_num] items in the popularity-biased distribution.
 
         Args:
@@ -106,7 +106,7 @@ class AbstractSampler(object):
 
         keys = list(self.prob.keys())
         random_index_list = np.random.randint(0, len(keys), sample_num)#从0--len(keys)-1 这么多个整数随机采样sample_num个，可能会重复
-        random_prob_list = np.random.random(sample_num)
+        random_prob_list = np.random.random(sample_num)#sample_num个0-1的概率值
         final_random_list = []
 
         for idx, prob in zip(random_index_list, random_prob_list):
@@ -140,7 +140,7 @@ class AbstractSampler(object):
         """
         raise NotImplementedError('Method [get_used_ids] should be implemented')
 
-    def sample_by_key_ids(self, key_ids, num):
+    def sample_by_key_ids(self, key_ids, num):#为每个key_id（如itemid）取num个样本
         """Sampling by key_ids.
 
         Args:
@@ -320,7 +320,7 @@ class KGSampler(AbstractSampler):
         """
         used_tail_entity_id = np.array([set() for _ in range(self.entity_num)])
         for hid, tid in zip(self.hid_list, self.tid_list):
-            used_tail_entity_id[hid].add(tid)
+            used_tail_entity_id[hid].add(tid)  #每个hid会对应多个tid
 
         for used_tail_set in used_tail_entity_id:
             if len(used_tail_set) + 1 == self.entity_num:  # [pad] is a entity.

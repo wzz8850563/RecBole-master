@@ -197,7 +197,7 @@ class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验
 
     def __init__(self, phases, datasets, distribution='uniform'):#phases, datasets两个列表登场，元素是相对应起来的
         if not isinstance(phases, list):
-            phases = [phases]  #比如train,valid，test
+            phases = [phases]  #'train' or 'evaluation'，见recbole.data.utils.get_dataloader
         if not isinstance(datasets, list):
             datasets = [datasets]
         if len(phases) != len(datasets):

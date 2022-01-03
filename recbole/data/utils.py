@@ -145,7 +145,7 @@ def get_dataloader(config, phase):
         'RaCT': _get_AE_dataloader,
         'RecVAE': _get_AE_dataloader,
     }
-
+    #特殊的模型
     if config['model'] in register_table:
         return register_table[config['model']](config, phase)
 

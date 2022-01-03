@@ -44,7 +44,7 @@ class AbstractDataLoader:
         self.config = config
         self.logger = getLogger()
         self.dataset = dataset
-        self.sampler = sampler
+        self.sampler = sampler #负采样模块
         self.batch_size = self.step = None
         self.shuffle = shuffle
         self.pr = 0
@@ -122,7 +122,7 @@ class NegSampleDataLoader(AbstractDataLoader):
             self.neg_sample_num = self.neg_sample_args['by']
 
             if self.dl_format == InputType.POINTWISE:
-                self.times = 1 + self.neg_sample_num
+                self.times = 1 + self.neg_sample_num #需要给负样本多复制self.neg_sample_num份数据，标签都为0，+1是因为包括原数据
                 self.sampling_func = self._neg_sample_by_point_wise_sampling
 
                 self.label_field = config['LABEL_FIELD']
@@ -143,30 +143,30 @@ class NegSampleDataLoader(AbstractDataLoader):
 
         elif self.neg_sample_args['strategy'] != 'none':
             raise ValueError(f'`neg_sample_args` [{self.neg_sample_args["strategy"]}] is not supported!')
-
+    #获取负样本
     def _neg_sampling(self, inter_feat):
         if self.neg_sample_args['strategy'] == 'by':
             user_ids = inter_feat[self.uid_field].numpy()
             item_ids = inter_feat[self.iid_field].numpy()
-            neg_item_ids = self.sampler.sample_by_user_ids(user_ids, item_ids, self.neg_sample_num)
+            neg_item_ids = self.sampler.sample_by_user_ids(user_ids, item_ids, self.neg_sample_num)#返回tensor数组，shape(user_ids,self.neg_sample_num)
             return self.sampling_func(inter_feat, neg_item_ids)
         else:
             return inter_feat
 
     def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_item_ids):
         inter_feat = inter_feat.repeat(self.times)
-        neg_item_feat = Interaction({self.iid_field: neg_item_ids})
-        neg_item_feat = self.dataset.join(neg_item_feat)
-        neg_item_feat.add_prefix(self.neg_prefix)
-        inter_feat.update(neg_item_feat)
+        neg_item_feat = Interaction({self.iid_field: neg_item_ids})#将负样本变成Interaction对象
+        neg_item_feat = self.dataset.join(neg_item_feat)#最终neg_item_feat为Interaction对象，为原书记新增一字段及相应的值
+        neg_item_feat.add_prefix(self.neg_prefix)#df全部字段都加上前缀，目前这里应该只有一个字段
+        inter_feat.update(neg_item_feat)#df的增加一列
         return inter_feat
 
     def _neg_sample_by_point_wise_sampling(self, inter_feat, neg_item_ids):
         pos_inter_num = len(inter_feat)
         new_data = inter_feat.repeat(self.times)
-        new_data[self.iid_field][pos_inter_num:] = neg_item_ids
-        new_data = self.dataset.join(new_data)
+        new_data[self.iid_field][pos_inter_num:] = neg_item_ids #相当于拼接
+        new_data = self.dataset.join(new_data)#new_data为Interaction对象
         labels = torch.zeros(pos_inter_num * self.times)
-        labels[:pos_inter_num] = 1.0
+        labels[:pos_inter_num] = 1.0  #所以 【:pos_inter_num】为1正样本，【pos_inter_num:】为0负样本。怎么 感觉和poinwise有点像
         new_data.update(Interaction({self.label_field: labels}))
         return new_data

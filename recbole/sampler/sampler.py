@@ -71,30 +71,31 @@ class AbstractSampler(object):
         """Build alias table for popularity_biased sampling.
         """
         candidates_list = self._get_candidates_list()
-        self.prob = dict(Counter(candidates_list))#item出现频次的分布
+        self.prob = dict(Counter(candidates_list))#item出现频次的分布，是个dict
         self.alias = self.prob.copy()
         large_q = []
         small_q = []
 
-        for i in self.prob:
-            self.alias[i] = -1
+        for i in self.prob:#i是key值，itemid等
+            self.alias[i] = -1 #先全部变成-1
             self.prob[i] = self.prob[i] / len(candidates_list) * len(self.prob)#相当于做了过缩放，使得出现一次的都在0-1的范围，出现2词以上有可能在0-1范围，也有可能>1
             if self.prob[i] > 1:#出现频次大的
                 large_q.append(i)
             elif self.prob[i] < 1: #出现频次小的
                 small_q.append(i)
-
+        #最终 self.alias中频率少的id对应的值为平频率大的id，代表选到这个id时，换成相应大频率id,并且越大的频率索引就越多的成为小频率索引得值，而对应大频率id值为-1,应该是选到这个id时，直接取。
         while len(large_q) != 0 and len(small_q) != 0:#循环直到large_q或small_q有一个为空，这个过程除了small_q中的索引对应的self.alias变成1外，large_q中的部分相对频率小的索引也会在self.alias变成1
             l = large_q.pop(0)
             s = small_q.pop(0)
-            self.alias[s] = l #small_q中的index都变成1
+            self.alias[s] = l #alias中对应small_q中index的位置的值都变成large_q.pop(0)如类似形式 {23：32，24：-1...}
             self.prob[l] = self.prob[l] - (1 - self.prob[s])#进行此操作后出现频率大的索引概率会减少  0-1de 范围
+            #所以每次循环只会large_q或者small_q其中一个少一个元素
             if self.prob[l] < 1:
                 small_q.append(l)
             elif self.prob[l] > 1:
                 large_q.append(l)
 
-    def _pop_sampling(self, sample_num):#根据热度采样，如有的itemid出现的频率多，相应的概率也会大
+    def _pop_sampling(self, sample_num):#对每个目标id采样对应的多个neg——id,根据热度采样，如有的itemid出现的频率多，相应的概率也会大
         """Sample [sample_num] items in the popularity-biased distribution.
 
         Args:
@@ -110,10 +111,10 @@ class AbstractSampler(object):
         final_random_list = []
 
         for idx, prob in zip(random_index_list, random_prob_list):
-            if self.prob[keys[idx]] > prob:
+            if self.prob[keys[idx]] > prob:#self.prob越大越可能触发该条件
                 final_random_list.append(keys[idx])
             else:
-                final_random_list.append(self.alias[keys[idx]])
+                final_random_list.append(self.alias[keys[idx]])#keys[idx]为小频率id时得对应的大频率id,keys[idx]为大频率id时-1
 
         return np.array(final_random_list)
 
@@ -133,7 +134,7 @@ class AbstractSampler(object):
         else:
             raise NotImplementedError(f'The sampling distribution [{self.distribution}] is not implemented.')
 
-    def get_used_ids(self):
+    def get_used_ids(self):# 以kg为例 #每个hid会对应多个tid，类似形式[(1,2),(3),(),(1,5)],索引位置代表headid
         """
         Returns:
             numpy.ndarray: Used ids. Index is key_id, and element is a set of value_ids.
@@ -156,21 +157,21 @@ class AbstractSampler(object):
         """
         key_ids = np.array(key_ids)
         key_num = len(key_ids)
-        total_num = key_num * num
-        if (key_ids == key_ids[0]).all():
+        total_num = key_num * num #一共要采样的id数
+        if (key_ids == key_ids[0]).all():#判断特殊情况，是否key_ids全部一样，或者只有一个
             key_id = key_ids[0]
-            used = np.array(list(self.used_ids[key_id]))
-            value_ids = self.sampling(total_num)
-            check_list = np.arange(total_num)[np.isin(value_ids, used)]
-            while len(check_list) > 0:
+            used = np.array(list(self.used_ids[key_id]))#以kg为例，获取hid所对应的所有tid
+            value_ids = self.sampling(total_num)#从全部候选中选出了一堆ids
+            check_list = np.arange(total_num)[np.isin(value_ids, used)]#找出正样本，check_list为返回正样本itemid
+            while len(check_list) > 0:#如果采样有正样本，重新对正样本相同数量采样，至到全部为负样本
                 value_ids[check_list] = value = self.sampling(len(check_list))
                 mask = np.isin(value, used)
                 check_list = check_list[mask]
-        else:
+        else:#一般情况
             value_ids = np.zeros(total_num, dtype=np.int64)
             check_list = np.arange(total_num)
-            key_ids = np.tile(key_ids, num)
-            while len(check_list) > 0:
+            key_ids = np.tile(key_ids, num)#[key_ids[0],key_ids[1]...key_ids[0],key_ids[1]...]重复num
+            while len(check_list) > 0:#和上面作用一样，以kg为例，保证只有每个hid采样的tid只有负样本
                 value_ids[check_list] = self.sampling(len(check_list))
                 check_list = np.array([
                     i for i, used, v in zip(check_list, self.used_ids[key_ids[check_list]], value_ids[check_list])
@@ -179,7 +180,7 @@ class AbstractSampler(object):
         return torch.tensor(value_ids)
 
 
-class Sampler(AbstractSampler):
+class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验证集被采样，训练验证集的正样本被测试集采样,因此一开始把所有数据混合做采样
     """:class:`Sampler` is used to sample negative items for each input user. In order to avoid positive items
     in train-phase to be sampled in valid-phase, and positive items in train-phase or valid-phase to be sampled
     in test-phase, we need to input the datasets of all phases for pre-processing. And, before using this sampler,
@@ -194,9 +195,9 @@ class Sampler(AbstractSampler):
         phase (str): the phase of sampler. It will not be set until :meth:`set_phase` is called.
     """
 
-    def __init__(self, phases, datasets, distribution='uniform'):
+    def __init__(self, phases, datasets, distribution='uniform'):#phases, datasets两个列表登场，元素是相对应起来的
         if not isinstance(phases, list):
-            phases = [phases]
+            phases = [phases]  #比如train,valid，test
         if not isinstance(datasets, list):
             datasets = [datasets]
         if len(phases) != len(datasets):
@@ -213,16 +214,16 @@ class Sampler(AbstractSampler):
 
         super().__init__(distribution=distribution)
 
-    def _get_candidates_list(self):
+    def _get_candidates_list(self):#把所有的itemid放入candidates_list
         candidates_list = []
         for dataset in self.datasets:
             candidates_list.extend(dataset.inter_feat[self.iid_field].numpy())
         return candidates_list
 
-    def _uni_sampling(self, sample_num):
+    def _uni_sampling(self, sample_num):#uniform sampling
         return np.random.randint(1, self.item_num, sample_num)
 
-    def get_used_ids(self):
+    def get_used_ids(self):#每个uid会对应多个iid，类似形式[(1,2),(3),(),(1,5)],索引位置代表userid
         """
         Returns:
             dict: Used item_ids is the same as positive item_ids.
@@ -231,9 +232,9 @@ class Sampler(AbstractSampler):
         used_item_id = dict()
         last = [set() for _ in range(self.user_num)]
         for phase, dataset in zip(self.phases, self.datasets):
-            cur = np.array([set(s) for s in last])
+            cur = np.array([set(s) for s in last])#用set(s)去掉重复，从循环到第二个phase, dataset开始有作用
             for uid, iid in zip(dataset.inter_feat[self.uid_field].numpy(), dataset.inter_feat[self.iid_field].numpy()):
-                cur[uid].add(iid)
+                cur[uid].add(iid)#cur类似[(1,2，1),(3),(),(1,5)],itemid可能有重复如(1,2，1)，索引位置代表userid
             last = used_item_id[phase] = cur
 
         for used_item_set in used_item_id[self.phases[-1]]:
@@ -312,7 +313,7 @@ class KGSampler(AbstractSampler):
     def _get_candidates_list(self):
         return list(self.hid_list) + list(self.tid_list)
 
-    def get_used_ids(self):
+    def get_used_ids(self):#获取每个hid都对应了那些tid
         """
         Returns:
             numpy.ndarray: Used entity_ids is the same as tail_entity_ids in knowledge graph.
@@ -320,7 +321,7 @@ class KGSampler(AbstractSampler):
         """
         used_tail_entity_id = np.array([set() for _ in range(self.entity_num)])
         for hid, tid in zip(self.hid_list, self.tid_list):
-            used_tail_entity_id[hid].add(tid)  #每个hid会对应多个tid
+            used_tail_entity_id[hid].add(tid)  #每个hid会对应多个tid，类似形式[(1,2),(3),(),(1,5)],索引位置代表headid
 
         for used_tail_set in used_tail_entity_id:
             if len(used_tail_set) + 1 == self.entity_num:  # [pad] is a entity.
@@ -330,7 +331,8 @@ class KGSampler(AbstractSampler):
                 )
         return used_tail_entity_id
 
-    def sample_by_entity_ids(self, head_entity_ids, num=1):
+    def sample_by_entity_ids(self, head_entity_ids, num=1):#每个head_entity_id采样的 entity_id都不一样，因为都是以
+        #如果head_entity_ids长度为5，num=2，则entity_ids形式[[0，5,10],[1,6,11],[2,7,12],[3,8,13],[4,9,14]]
         """Sampling by head_entity_ids.
 
         Args:
@@ -453,7 +455,7 @@ class SeqSampler(AbstractSampler):
     def get_used_ids(self):
         pass
 
-    def sample_neg_sequence(self, pos_sequence):
+    def sample_neg_sequence(self, pos_sequence):#pos_sequence每个序列要预测的item组成的序列，shape of `(N, )
         """For each moment, sampling one item from all the items except the one the user clicked on at that moment.
 
         Args:
@@ -463,7 +465,7 @@ class SeqSampler(AbstractSampler):
             torch.tensor : all users' negative item history sequence.
 
         """
-        total_num = len(pos_sequence)
+        total_num = len(pos_sequence)#等于序列总数
         value_ids = np.zeros(total_num, dtype=np.int64)
         check_list = np.arange(total_num)
         while len(check_list) > 0:

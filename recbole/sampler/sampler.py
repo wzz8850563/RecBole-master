@@ -180,7 +180,8 @@ class AbstractSampler(object):
         return torch.tensor(value_ids)
 
 
-class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验证集被采样，训练验证集的正样本被测试集采样,因此一开始把所有数据混合做采样
+class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验证集被采样，训练验证集的正样本被测试集采样,因此一开始把所有数据混合做采样,
+    #但是，注意会有eval出现的正样本，被train采样为负样本，见235-239行代码实现，与RepeatableSampler区别
     """:class:`Sampler` is used to sample negative items for each input user. In order to avoid positive items
     in train-phase to be sampled in valid-phase, and positive items in train-phase or valid-phase to be sampled
     in test-phase, we need to input the datasets of all phases for pre-processing. And, before using this sampler,
@@ -214,7 +215,7 @@ class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验
 
         super().__init__(distribution=distribution)
 
-    def _get_candidates_list(self):#把所有的itemid放入candidates_list
+    def _get_candidates_list(self):#把所有的itemid放入candidates_list，包括train,valid,test
         candidates_list = []
         for dataset in self.datasets:
             candidates_list.extend(dataset.inter_feat[self.iid_field].numpy())
@@ -231,7 +232,7 @@ class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验
         """
         used_item_id = dict()
         last = [set() for _ in range(self.user_num)]
-        for phase, dataset in zip(self.phases, self.datasets):
+        for phase, dataset in zip(self.phases, self.datasets):#used_item_id按phase分开，即trian统计本数据，valid统计train,valid数据，test统计所有数据
             cur = np.array([set(s) for s in last])#用set(s)去掉重复，从循环到第二个phase, dataset开始有作用
             for uid, iid in zip(dataset.inter_feat[self.uid_field].numpy(), dataset.inter_feat[self.iid_field].numpy()):
                 cur[uid].add(iid)#cur类似[(1,2，1),(3),(),(1,5)],itemid可能有重复如(1,2，1)，索引位置代表userid
@@ -246,7 +247,7 @@ class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验
                 )
         return used_item_id
 
-    def set_phase(self, phase):
+    def set_phase(self, phase):#由于Sampler一次传入trian,valid,test等一起处理，该函数用于保留具体某一个
         """Get the sampler of corresponding phase.
 
         Args:
@@ -360,7 +361,7 @@ class RepeatableSampler(AbstractSampler):
 
     Args:
         phases (str or list of str): All the phases of input.
-        dataset (Dataset): The union of all datasets for each phase.
+        dataset (Dataset): The union of all datasets for each phase.              ##与Sampler区别，Sampler是分开的datasets
         distribution (str, optional): Distribution of the negative items. Defaults to 'uniform'.
 
     Attributes:
@@ -385,7 +386,7 @@ class RepeatableSampler(AbstractSampler):
     def _get_candidates_list(self):
         return list(self.dataset.inter_feat[self.iid_field].numpy())
 
-    def get_used_ids(self):
+    def get_used_ids(self):#
         """
         Returns:
             numpy.ndarray: Used item_ids is the same as positive item_ids.
@@ -393,7 +394,7 @@ class RepeatableSampler(AbstractSampler):
         """
         return np.array([set() for _ in range(self.user_num)])
 
-    def sample_by_user_ids(self, user_ids, item_ids, num):
+    def sample_by_user_ids(self, user_ids, item_ids, num):#user_ids, item_ids 并非唯一，所以注意self.used_ids的构建都是本行itemid,所以每行负样本除了本行itemid其他都可以，适合用于seq序列，其他的模型需要另外在看前情况
         """Sampling by user_ids.
 
         Args:

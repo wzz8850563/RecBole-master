@@ -96,7 +96,7 @@ def data_preparation(config, dataset, save=False):
             - test_data (AbstractDataLoader): The dataloader for testing.
     """
     model_type = config['MODEL_TYPE']
-    built_datasets = dataset.build()
+    built_datasets = dataset.build()#built_datasets包含了 train_dataset, valid_dataset, test_dataset
     logger = getLogger()
 
     train_dataset, valid_dataset, test_dataset = built_datasets
@@ -152,15 +152,15 @@ def get_dataloader(config, phase):
     model_type = config['MODEL_TYPE']
     if phase == 'train':
         if model_type != ModelType.KNOWLEDGE:
-            return TrainDataLoader
+            return TrainDataLoader   #参数 (config, train_dataset, train_sampler, kg_sampler, shuffle=True)
         else:
-            return KnowledgeBasedDataLoader
-    else:
+            return KnowledgeBasedDataLoader   #参数(config, train_dataset, train_sampler, kg_sampler, shuffle=True)
+    else:#phase == 'evaluation'
         eval_strategy = config['eval_neg_sample_args']['strategy']
         if eval_strategy in {'none', 'by'}:
-            return NegSampleEvalDataLoader
+            return NegSampleEvalDataLoader  #参数(config, valid_dataset, valid_sampler, shuffle=False)
         elif eval_strategy == 'full':
-            return FullSortEvalDataLoader
+            return FullSortEvalDataLoader  #参数(config, valid_dataset, valid_sampler, shuffle=False)
 
 
 def _get_AE_dataloader(config, phase):
@@ -204,6 +204,8 @@ def create_samplers(config, dataset, built_datasets):
     sampler = None
     train_sampler, valid_sampler, test_sampler = None, None, None
 
+
+    #注意，以下train_sampler，valid_sampler，test_sampler
     if train_neg_sample_args['strategy'] != 'none':
         if not config['repeatable']:
             sampler = Sampler(phases, built_datasets, train_neg_sample_args['distribution'])

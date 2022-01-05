@@ -177,7 +177,7 @@ class AbstractSampler(object):
                     i for i, used, v in zip(check_list, self.used_ids[key_ids[check_list]], value_ids[check_list])
                     if v in used
                 ])
-        return torch.tensor(value_ids)
+        return torch.tensor(value_ids)#返回一维的tensor数组，如tensor([ 865,  393, 1348,  631,   92, 1662])
 
 
 class Sampler(AbstractSampler):#负采样，要防止训练集的正样本在验证集被采样，训练验证集的正样本被测试集采样,因此一开始把所有数据混合做采样,
@@ -355,7 +355,7 @@ class KGSampler(AbstractSampler):
                     raise ValueError(f'head_entity_id [{head_entity_id}] not exist.')
 
 
-class RepeatableSampler(AbstractSampler):
+class RepeatableSampler(AbstractSampler):#主要用于seq,因为used_id的逻辑是，由于每行是一个序列并不是userid-itemid对，所以每行的负样本是所有其他itemid,除了seq的label.
     """:class:`RepeatableSampler` is used to sample negative items for each input user. The difference from
     :class:`Sampler` is it can only sampling the items that have not appeared at all phases.
 

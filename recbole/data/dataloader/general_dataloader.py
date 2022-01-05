@@ -177,7 +177,7 @@ class FullSortEvalDataLoader(AbstractDataLoader):
             dataset.sort(by=self.uid_field, ascending=True)#按userid排好序
             last_uid = None
             positive_item = set()
-            uid2used_item = sampler.used_ids#user和所有交互的itemd对应表，类似形式[(1,2),(3),(),(1,5)],索引位置代表userid
+            uid2used_item = sampler.used_ids#user和所有交互的itemd对应表，类似形式[(1,2),(3),(),(1,5)],索引位置代表userid,如果是repeatsample,返回的是 array([{1}, {3}, {1}, {2}, {3}, {4}, {1}, {3}], dtype=object)，长度为inter行数
             for uid, iid in zip(dataset.inter_feat[self.uid_field].numpy(), dataset.inter_feat[self.iid_field].numpy()):
                 if uid != last_uid:#遍历数据，当又到了新的userid,执行代码
                     self._set_user_property(last_uid, uid2used_item[last_uid], positive_item)

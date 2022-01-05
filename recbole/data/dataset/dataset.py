@@ -1245,7 +1245,7 @@ class Dataset(object):
             if getattr(self, field_name, None) is None:
                 raise ValueError(f'{field_name} isn\'t set.')
 
-    def join(self, df):
+    def join(self, df):#注意这里的df不是dataframe，而是为Interaction类，因此update函数来源于Interaction，作用是新增列（字段）数据
         """Given interaction feature, join user/item feature into it.
 
         Args:
@@ -1254,9 +1254,9 @@ class Dataset(object):
         Returns:
             Interaction: Interaction feature after joining operation.
         """
-        if self.user_feat is not None and self.uid_field in df:
+        if self.user_feat is not None and self.uid_field in df:#加上user的额外特征，比如年龄之类的，conext_aware模型使用
             df.update(self.user_feat[df[self.uid_field]])
-        if self.item_feat is not None and self.iid_field in df:
+        if self.item_feat is not None and self.iid_field in df:#加上item的额外特征，比如年龄之类的，conext_aware模型使用
             df.update(self.item_feat[df[self.iid_field]])
         return df
 

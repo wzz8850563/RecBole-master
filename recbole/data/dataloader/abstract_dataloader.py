@@ -148,25 +148,25 @@ class NegSampleDataLoader(AbstractDataLoader):
         if self.neg_sample_args['strategy'] == 'by':
             user_ids = inter_feat[self.uid_field].numpy()
             item_ids = inter_feat[self.iid_field].numpy()
-            neg_item_ids = self.sampler.sample_by_user_ids(user_ids, item_ids, self.neg_sample_num)#返回tensor数组，shape(user_ids,self.neg_sample_num)
+            neg_item_ids = self.sampler.sample_by_user_ids(user_ids, item_ids, self.neg_sample_num)#返回一维tensor数组，shape(user_ids*self.neg_sample_num)
             return self.sampling_func(inter_feat, neg_item_ids) #返回的结果为原来的inter_feat加上了负样本数据
         else:
             return inter_feat
 
-    def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_item_ids):
+    def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_item_ids):#inter_feat 为Interaction类
         inter_feat = inter_feat.repeat(self.times)
         neg_item_feat = Interaction({self.iid_field: neg_item_ids})#将负样本变成Interaction对象
-        neg_item_feat = self.dataset.join(neg_item_feat)#最终neg_item_feat为Interaction对象，为原书记新增一字段及相应的值
+        neg_item_feat = self.dataset.join(neg_item_feat)#如果有，加上item的额外特征，
         neg_item_feat.add_prefix(self.neg_prefix)#df全部字段都加上前缀，目前这里应该只有一个字段
-        inter_feat.update(neg_item_feat)#df的增加一列
-        return inter_feat
+        inter_feat.update(neg_item_feat)#新增neg_item_feat一列
+        return inter_feat #返回形式为pair-wise inter形式,Interaction类
 
     def _neg_sample_by_point_wise_sampling(self, inter_feat, neg_item_ids):
         pos_inter_num = len(inter_feat)
         new_data = inter_feat.repeat(self.times)
         new_data[self.iid_field][pos_inter_num:] = neg_item_ids #相当于拼接
-        new_data = self.dataset.join(new_data)#new_data为Interaction对象
+        new_data = self.dataset.join(new_data)#
         labels = torch.zeros(pos_inter_num * self.times)
         labels[:pos_inter_num] = 1.0  #所以 【:pos_inter_num】为1正样本，【pos_inter_num:】为0负样本。怎么 感觉和poinwise有点像
         new_data.update(Interaction({self.label_field: labels}))
-        return new_data
+        return new_data #返回形式为point-wise inter形式,Interaction类

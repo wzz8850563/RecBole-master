@@ -374,7 +374,7 @@ class Trainer(AbstractTrainer):
         interaction, history_index, positive_u, positive_i = batched_data
         try:
             # Note: interaction without item ids
-            scores = self.model.full_sort_predict(interaction.to(self.device))
+            scores = self.model.full_sort_predict(interaction.to(self.device))## 所以凡是有full_sort_predict,interaction在
         except NotImplementedError:
             inter_len = len(interaction)
             new_inter = interaction.to(self.device).repeat_interleave(self.tot_item_num)
@@ -409,7 +409,7 @@ class Trainer(AbstractTrainer):
             return interaction, scores, positive_u, positive_i
 
     @torch.no_grad()
-    def evaluate(self, eval_data, load_best_model=True, model_file=None, show_progress=False):
+    def evaluate(self, eval_data, load_best_model=True, model_file=None, show_progress=False):#eval_data是DataLoader
         r"""Evaluate the model based on the eval data.
 
         Args:
@@ -442,7 +442,7 @@ class Trainer(AbstractTrainer):
         if isinstance(eval_data, FullSortEvalDataLoader):
             eval_func = self._full_sort_batch_eval
             if self.item_tensor is None:
-                self.item_tensor = eval_data.dataset.get_item_feature().to(self.device)
+                self.item_tensor = eval_data.dataset.get_item_feature().to(self.device)#如果有item特征，返回itemid和对应的特征，如果没有，值返回itemid,interaction类
         else:
             eval_func = self._neg_sample_batch_eval
         if self.config['eval_type'] == EvaluatorType.RANKING:

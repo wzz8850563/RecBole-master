@@ -287,7 +287,7 @@ class KGAT(KnowledgeRecommender):
         if self.restore_user_e is None or self.restore_entity_e is None:
             self.restore_user_e, self.restore_entity_e = self.forward()
         u_embeddings = self.restore_user_e[user]
-        i_embeddings = self.restore_entity_e[:self.n_items]
+        i_embeddings = self.restore_entity_e[:self.n_items]#[:self.n_items]，后面的应该是非item实体
 
         scores = torch.matmul(u_embeddings, i_embeddings.transpose(0, 1))
 

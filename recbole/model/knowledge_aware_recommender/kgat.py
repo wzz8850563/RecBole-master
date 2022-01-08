@@ -107,7 +107,7 @@ class KGAT(KnowledgeRecommender):
         self.relation_embedding = nn.Embedding(self.n_relations, self.kg_embedding_size)
         self.trans_w = nn.Embedding(self.n_relations, self.embedding_size * self.kg_embedding_size)#self.embedding_size * self.kg_embedding_size 的矩阵
         self.aggregator_layers = nn.ModuleList()
-        for idx, (input_dim, output_dim) in enumerate(zip(self.layers[:-1], self.layers[1:])):
+        for idx, (input_dim, output_dim) in enumerate(zip(self.layers[:-1], self.layers[1:])):#self.layers如果是多层，如self.layers=[64,128,64],由于这三层连载一起，因此前面一层的output_size等于后面一层的input_size,所以zip(self.layers[:-1], self.layers[1:])这样表达
             self.aggregator_layers.append(Aggregator(input_dim, output_dim, self.mess_dropout, self.aggregator_type))
         self.tanh = nn.Tanh()
         self.mf_loss = BPRLoss()
@@ -127,7 +127,7 @@ class KGAT(KnowledgeRecommender):
         """
         import dgl
         adj_list = []
-        for rel_type in range(1, self.n_relations, 1):#遍历所有relation,除了第0个，是user对item的行为
+        for rel_type in range(1, self.n_relations, 1):#遍历所有relation,除了第0个，[pad]
             edge_idxs = self.ckg.filter_edges(lambda edge: edge.data['relation_id'] == rel_type)
             sub_graph = dgl.edge_subgraph(self.ckg, edge_idxs, preserve_nodes=True). \
                 adjacency_matrix(transpose=False, scipy_fmt='coo').astype('float')#遍历每个relation,取出当前relation成的边作为节点，转化成矩阵形式

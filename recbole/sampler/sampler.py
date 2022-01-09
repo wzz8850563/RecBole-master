@@ -433,7 +433,7 @@ class RepeatableSampler(AbstractSampler):#主要用于seq,因为used_id的逻辑
         return new_sampler
 
 
-class SeqSampler(AbstractSampler):
+class SeqSampler(AbstractSampler):#目前看和RepeatableSampler逻辑基本一样，只是这里只采样1个
     """:class:`SeqSampler` is used to sample negative item sequence.
 
         Args:

@@ -145,12 +145,12 @@ class NegSampleDataLoader(AbstractDataLoader):
             raise ValueError(f'`neg_sample_args` [{self.neg_sample_args["strategy"]}] is not supported!')
     #获取负样本
     def _neg_sampling(self, inter_feat):
-        if self.neg_sample_args['strategy'] == 'by':
+        if self.neg_sample_args['strategy'] == 'by':#可看出这样的参数基本只适用userid,itemid这样的交互类型数据，不适合seq，用于seq回踩杨处负样本作为正例数据，l酸依这应该就是为什么loss很难降低，因为加入了错误样本
             user_ids = inter_feat[self.uid_field].numpy()
             item_ids = inter_feat[self.iid_field].numpy()
             neg_item_ids = self.sampler.sample_by_user_ids(user_ids, item_ids, self.neg_sample_num)#返回一维tensor数组，shape(user_ids*self.neg_sample_num)
             return self.sampling_func(inter_feat, neg_item_ids) #返回的结果为原来的inter_feat加上了负样本数据
-        else:
+        else:#'strategy'为'none'或者full,用于seq合适，
             return inter_feat
 
     def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_item_ids):#inter_feat 为Interaction类

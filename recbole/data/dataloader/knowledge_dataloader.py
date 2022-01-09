@@ -17,7 +17,7 @@ from recbole.data.interaction import Interaction
 from recbole.utils import InputType, KGDataLoaderState
 
 
-class KGDataLoader(AbstractDataLoader):
+class KGDataLoader(AbstractDataLoader):#一般kg模型会额外有一个calculate_kg_loss函数用于同时训练kg表示
     """:class:`KGDataLoader` is a dataloader which would return the triplets with negative examples
     in a knowledge graph.
 
@@ -70,7 +70,7 @@ class KGDataLoader(AbstractDataLoader):
         return cur_data
 
 
-class KnowledgeBasedDataLoader(AbstractDataLoader):
+class KnowledgeBasedDataLoader(AbstractDataLoader):#在适当时候切换KGDataLoader和TrainDataLoader
     """:class:`KnowledgeBasedDataLoader` is used for knowledge based model.
 
     It has three states, which is saved in :attr:`state`.

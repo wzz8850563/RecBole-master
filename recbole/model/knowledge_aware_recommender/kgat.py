@@ -151,9 +151,9 @@ class KGAT(KnowledgeRecommender):
         return ego_embeddings
 
     def forward(self):#这样只是走了一轮，即用周围实体更新一遍实体而已
-        ego_embeddings = self._get_ego_embeddings()
+        ego_embeddings = self._get_ego_embeddings()#每一轮开始训练，都不是用上一轮的ego_embeddings，还是用user_emb和item_emb，这两个的变化只由于梯度下降的更新，不是跟着ego_emb一起变化
         embeddings_list = [ego_embeddings]
-        for aggregator in self.aggregator_layers:
+        for aggregator in self.aggregator_layers:#有多少个aggregator，就是 high-oder propagation 的l-th steps
             ego_embeddings = aggregator(self.A_in, ego_embeddings)
             norm_embeddings = F.normalize(ego_embeddings, p=2, dim=1)#以2位范数，矩阵的每行进行标准化为单位向量，即a/np.sqrt(a**2+b**2+...),
             embeddings_list.append(norm_embeddings)

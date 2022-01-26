@@ -1489,7 +1489,7 @@ class Dataset(object):
         split_mode = list(split_args.keys())[0]
         assert len(split_args.keys()) == 1
         group_by = self.config['eval_args']['group_by']
-        if split_mode == 'RS': 
+        if split_mode == 'RS': #即先分组，比如按userid分组，不按顺序按比例随机抽。
             if not isinstance(split_args['RS'], list):
                 raise ValueError(f'The value of "RS" [{split_args}] should be a list.')
             if group_by is None or group_by.lower() == 'none':
@@ -1498,7 +1498,7 @@ class Dataset(object):
                 datasets = self.split_by_ratio(split_args['RS'], group_by=self.uid_field)
             else:
                 raise NotImplementedError(f'The grouping method [{group_by}] has not been implemented.')
-        elif split_mode == 'LS':
+        elif split_mode == 'LS':#leave_one_out即先分组，比如按userid分组，然后一般按顺序排列，比如'TO'按时间排序，这样前面的都是训练集，取最后2个做验证测试集，或只取一个做验证集或测试集
             datasets = self.leave_one_out(group_by=self.uid_field, leave_one_mode=split_args['LS'])
         else:
             raise NotImplementedError(f'The splitting_method [{split_mode}] has not been implemented.')

@@ -88,19 +88,19 @@ class RippleNet(KnowledgeRecommender):
         Returns:
             ripple_set (dict)
         """
-        ripple_set = collections.defaultdict(list)
+        ripple_set = collections.defaultdict(list)#collections.defaultdict(list)初始化{}，
         n_padding = 0 #记录有多少个用户一开始的所有历史item实体都没有实体关系需要padding的
         for user in self.user_dict:
             for h in range(self.n_hop):
-                memories_h = []
-                memories_r = []
-                memories_t = []
+                memories_h = []#当前hop  h实体集
+                memories_r = []#当前hop  r关系集
+                memories_t = []#当前hop  t实体集
 
                 if h == 0:
-                    tails_of_last_hop = self.user_dict[user]  #第一层用用户历史浏览item
+                    tails_of_last_hop = self.user_dict[user]  #第一层用用户历史浏览items
                 else:
                     #上一个hit的尾实体，作为本次hit头实体,即memories_t，是一个list形式
-                    tails_of_last_hop = ripple_set[user][-1][2] #每个用户的实体传播矩阵ripple_set[user]为[(memories_h, memories_r, memories_t),(memories_h, memories_r, memories_t)...],有多少个就有多少个 元祖
+                    tails_of_last_hop = ripple_set[user][-1][2] #即上一个hop的memories_t，每个用户的当前hop下实体传播矩阵ripple_set[user]为[(memories_h, memories_r, memories_t),(memories_h, memories_r, memories_t)...],有多少个hop就有多少个 元祖
 
                 for entity in tails_of_last_hop:#上一层的实体作为头实体找尾实体
                     if entity not in self.kg:
@@ -112,7 +112,7 @@ class RippleNet(KnowledgeRecommender):
 
                 # if the current ripple set of the given user is empty,
                 # we simply copy the ripple set of the last hop here
-                if len(memories_h) == 0:#用户当前hit所有实体都没有关系实体走下去
+                if len(memories_h) == 0:#用户当前hop所有实体都没有关系实体走下去
                     if h == 0:#0-hop
                         # self.logger.info("user {} without 1-hop kg facts, fill with padding".format(user))
                         # raise AssertionError("User without facts in 1st hop")
@@ -125,7 +125,7 @@ class RippleNet(KnowledgeRecommender):
                         memories_t = torch.LongTensor(memories_t).to(self.device)
                         ripple_set[user].append((memories_h, memories_r, memories_t))
                     else:#1-n -hop
-                        ripple_set[user].append(ripple_set[user][-1])#
+                        ripple_set[user].append(ripple_set[user][-1])#ripple_set[user][-1]就是([0,0,..0],[0,0,..0],[0,0,..0])
                 else:# 
                     # sample a fixed-size 1-hop memory for each user
                     replace = len(memories_h) < self.n_memory #当前hit实体数少于最低实体数
@@ -142,12 +142,12 @@ class RippleNet(KnowledgeRecommender):
 
     def forward(self, interaction):#输入为interaction类
         users = interaction[self.USER_ID].cpu().numpy()
-        memories_h, memories_r, memories_t = {}, {}, {}
+        memories_h, memories_r, memories_t = {}, {}, {}#例子memories_h={0:[[...](user0的实体集),[...](user1的实体集)],1:[...]}
         for hop in range(self.n_hop):
             memories_h[hop] = []
             memories_r[hop] = []
             memories_t[hop] = []
-            for user in users:
+            for user in users:#inter的user,不是唯一，当成batch
                 memories_h[hop].append(self.ripple_set[user][hop][0])#memories_h为{'0':[[item1,item2],[item3,item4],...](长度为batchsize),'n':[[item1,item2],[item3,item4],...]}二维形式，其中0,n为hit,[item1,item2]，[item3,item4]分别对应不同user
                 memories_r[hop].append(self.ripple_set[user][hop][1])#memories_r为{'0':[[r1,r2],[r3,r4],...],'n':[[r1,r2],[r3,r4],...]}二维形式，其中[item1,item2]，[item3,item4]分别对应不同user
                 memories_t[hop].append(self.ripple_set[user][hop][2])
@@ -160,7 +160,7 @@ class RippleNet(KnowledgeRecommender):
         self.t_emb_list = []
         for i in range(self.n_hop):
             # [batch size * n_memory]
-            head_ent = torch.cat(memories_h[i], dim=0)#变成一维 （batch size * n_memory，），通过后面self.entity_embedding方便转成向量
+            head_ent = torch.cat(memories_h[i], dim=0)#变成一维 （batch size * n_memory，）,一维和一维concat还是一维，通过后面self.entity_embedding方便转成向量
             relation = torch.cat(memories_r[i], dim=0)
             tail_ent = torch.cat(memories_t[i], dim=0)
             # self.logger.info("Hop {}, size {}".format(i, head_ent.size(), relation.size(), tail_ent.size()))
@@ -174,12 +174,12 @@ class RippleNet(KnowledgeRecommender):
             # [batch size * n_memory, dim]
             self.t_emb_list.append(self.entity_embedding(tail_ent))
 
-        o_list = self._key_addressing()
+        o_list = self._key_addressing()#[[batch_size, dim],[batch_size, dim],[batch_size, dim]...]有多少个hop有多少[batch_size, dim]
         #将o相加起来，即得到用户兴趣向量
         y = o_list[-1]
         for i in range(self.n_hop - 1):
-            y = y + o_list[i]
-        scores = torch.sum(self.item_embeddings * y, dim=1)
+            y = y + o_list[i] #最终y [batch_size, dim]  相当于user的向量表示 
+        scores = torch.sum(self.item_embeddings * y, dim=1)#[batch_size] 
         return scores
 
     def _key_addressing(self):
@@ -213,9 +213,9 @@ class RippleNet(KnowledgeRecommender):
             tail_emb = self.t_emb_list[hop].view(-1, self.n_memory, self.embedding_size)#[batch_size, n_memory, dim]
 
             # [batch_size, dim]
-            o = torch.sum(tail_emb * probs_expanded, dim=1)
+            o = torch.sum(tail_emb * probs_expanded, dim=1)#加权的item,或者说由tail实体集加权组成当前head的表示
 
-            self.item_embeddings = self.transform_matrix(self.item_embeddings + o)#更新item_embedding， ？？？？？？
+            self.item_embeddings = self.transform_matrix(self.item_embeddings + o)#更新item_embedding，对于下一个hop通过加权相加得到新的item_emb作为下一个hop的item
             # item embedding update
             o_list.append(o)
         return o_list
@@ -234,9 +234,9 @@ class RippleNet(KnowledgeRecommender):
             # (batch_size * n_memory, dim, dim)
             r_mat = self.r_emb_list[hop].view(-1, self.embedding_size, self.embedding_size)
             # (N, 1, dim) (N, dim, dim) -> (N, 1, dim)
-            hR = torch.bmm(h_expanded, r_mat).squeeze(1)
+            hR = torch.bmm(h_expanded, r_mat).squeeze(1)#(batch_size * n_memory, dim)
             # (N, dim) (N, dim)
-            hRt = torch.sum(hR * t_expanded, dim=1)
+            hRt = torch.sum(hR * t_expanded, dim=1)#(batch_size * n_memory,)#求相似度
             if kge_loss is None:
                 kge_loss = torch.mean(self.sigmoid(hRt))
             else:
@@ -244,13 +244,13 @@ class RippleNet(KnowledgeRecommender):
 
         reg_loss = None
         for hop in range(self.n_hop):
-            tp_loss = self.l2_loss(self.h_emb_list[hop], self.t_emb_list[hop], self.r_emb_list[hop])
+            tp_loss = self.l2_loss(self.h_emb_list[hop], self.t_emb_list[hop], self.r_emb_list[hop])#这是保安重复实体的embdding参数正则，这样是否好，相当于hop越多loss也会越大
             if reg_loss is None:
                 reg_loss = tp_loss
             else:
                 reg_loss = reg_loss + tp_loss
         reg_loss = reg_loss + self.l2_loss(self.transform_matrix.weight)
-        loss = rec_loss - self.kg_weight * kge_loss + self.reg_weight * reg_loss
+        loss = rec_loss - self.kg_weight * kge_loss + self.reg_weight * reg_loss#为什么-self.kg_weight * kge_loss，减法
 
         return loss
 

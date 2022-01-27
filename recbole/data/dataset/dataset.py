@@ -1260,9 +1260,9 @@ class Dataset(object):
             df.update(self.item_feat[df[self.iid_field]])
         return df
 
-    def __getitem__(self, index, join=True):
+    def __getitem__(self, index, join=True):## 真实放到模型中，已经处理好的数据
         df = self.inter_feat[index]
-        return self.join(df) if join else df
+        return self.join(df) if join else df #join的目的是吧其他side——information一起整合起来，不然只有 user_item交互
 
     def __len__(self):
         return len(self.inter_feat)

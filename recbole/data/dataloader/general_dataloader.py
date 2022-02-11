@@ -201,10 +201,10 @@ class FullSortEvalDataLoader(AbstractDataLoader):
 
     def _init_batch_size_and_step(self):
         batch_size = self.config['eval_batch_size']
-        if not self.is_sequential:#非序列
+        if not self.is_sequential:#非序列  ，因为配合 model.full_sort_predict函数，每个用户都和所有item计算分数，因此要保证batch_size是【n，all_item_nums】,
             batch_num = max(batch_size // self.dataset.item_num, 1)#为了保证每个batch能评估所有itemid的前提下，和设置的batch_size尽可能接近，
             new_batch_size = batch_num * self.dataset.item_num #这样使得每次eval都覆盖所有itemid，并且是完整的batch_num被
-            self.step = batch_num
+            self.step = batch_num #batch_num为用户数，代表每次计算多少个用户
             self.set_batch_size(new_batch_size)
         else:
             self.step = batch_size
@@ -235,7 +235,7 @@ class FullSortEvalDataLoader(AbstractDataLoader):
             positive_i = torch.cat(list(positive_item))
 
             self.pr += self.step
-            return user_df, (history_u, history_i), positive_u, positive_i
+            return user_df, (history_u, history_i), positive_u, positive_i#history_u, history_i,因为做排序指标计算时，排好序后要排除放在训练集的正样本
         else:
             interaction = self.dataset[self.pr:self.pr + self.step]
             inter_num = len(interaction)

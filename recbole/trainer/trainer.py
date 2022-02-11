@@ -385,9 +385,9 @@ class Trainer(AbstractTrainer):
             else:
                 scores = self._spilt_predict(new_inter, batch_size)
 
-        scores = scores.view(-1, self.tot_item_num)
+        scores = scores.view(-1, self.tot_item_num) #变成[batch_user_nums,total_item_num]
         scores[:, 0] = -np.inf
-        if history_index is not None:
+        if history_index is not None: #吧训练集中正样本排在最后面，这样排在前面的都是没做训练集的，验证的是测试集正样本的排序情况
             scores[history_index] = -np.inf
         return interaction, scores, positive_u, positive_i
 
